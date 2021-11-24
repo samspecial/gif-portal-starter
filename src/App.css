@@ -55,6 +55,7 @@
 .connect-wallet-button {
   background: -webkit-linear-gradient(left, #60c657, #35aee2);
   background-size: 200% 200%;
+  margin-bottom: 30px;
   animation: gradient-animation 4s ease infinite;
 }
 
@@ -111,7 +112,7 @@
   object-fit: cover;
 }
 
-.connected-container input[type='text'] {
+.connected-container input[type="text"] {
   display: inline-block;
   color: white;
   padding: 10px;
