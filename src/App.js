@@ -2,28 +2,31 @@ import { useState, useEffect } from "react";
 import twitterLogo from "./assets/twitter-logo.svg";
 import "./App.css";
 import Form from "./components/Form";
+import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { Program, Provider, web3 } from "@project-serum/anchor";
+import idl from "./idl.json";
+import kp from "./keypair.json";
+
+// 8aTD2oktQ3abJr91FAW1fvYWbB8BeVLz5CWtXpuRU2Z
+
+const { SystemProgram, Keypair } = web3;
+//get keypair
+const arr = Object.values(kp._keypair.secretKey);
+const secret = new Uint8Array(arr);
+const baseAccount = web3.Keypair.fromSecretKey(secret);
+
+const programID = new PublicKey(idl.metadata.address);
+// Set our network to devnet.
+const network = clusterApiUrl("devnet");
+
+// Controls how we want to acknowledge when a transaction is "done".
+const opts = {
+  preflightCommitment: "processed",
+};
 
 // Constants
 const TWITTER_HANDLE = "samuelosinloye";
 const TWITTER_LINK = `https://twitter.com/${TWITTER_HANDLE}`;
-const TEST_GIFS = [
-  "https://media.giphy.com/media/k481R5ERN7jJm/giphy.gif",
-  "https://media.giphy.com/media/l1J9BSsgrLzeRET6w/giphy.gif",
-  "https://media2.giphy.com/media/l0Iyo62D7qCPHKvxC/200.webp?cid=ecf05e47kvdzuyof18lp5fflfjix11p0dfbvtrr43bjogh3b&rid=200.webp&ct=g",
-  "https://media.giphy.com/media/9BdxKdIOsxATC/giphy.gif",
-  "https://media.giphy.com/media/ocXjZoA4Eg6D01QA3r/giphy.gif",
-  "https://media.giphy.com/media/AF1OSGq0jd7oeaN8t2/giphy.gif",
-  "https://media.giphy.com/media/3o6vXWMK8xYuzOXwJO/giphy.gif",
-  "https://media.giphy.com/media/OZrPXapZq0EcU/giphy.gif",
-  "https://media.giphy.com/media/LI7DRrJeN0dIk/giphy.gif",
-  "https://media.giphy.com/media/ibjzmmQo9RuHOR6IGN/giphy.gif",
-  "https://media.giphy.com/media/a0QJ4PfN5Fbry/giphy.gif",
-  "https://media.giphy.com/media/yrvffEW2hbRU8ldDjV/giphy.gif",
-  "https://media.giphy.com/media/3orieNjYWHxLMDkomY/giphy.gif",
-  "https://media.giphy.com/media/3oriNR564J11d4V5OU/giphy.gif",
-  "https://media.giphy.com/media/KPaJ8b9Ztkty0/giphy.gif",
-  "https://media.giphy.com/media/3ornjM1ow4vbrifDAA/giphy.gif",
-];
 
 const App = () => {
   const [walletAddress, setWalletAddress] = useState(null);
@@ -70,6 +73,39 @@ const App = () => {
     setInputValue(value);
   };
 
+  const getProvider = () => {
+    const connection = new Connection(network, opts.preflightCommitment);
+    const provider = new Provider(
+      connection,
+      window.solana,
+      opts.preflightCommitment
+    );
+    return provider;
+  };
+
+  const createGifAccount = async () => {
+    try {
+      const provider = getProvider();
+      const program = new Program(idl, programID, provider);
+      console.log("ping");
+      await program.rpc.startStuffOff({
+        accounts: {
+          baseAccount: baseAccount.publicKey,
+          user: provider.wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        },
+        signers: [baseAccount],
+      });
+      console.log(
+        "Created a new BaseAccount w/ address:",
+        baseAccount.publicKey.toString()
+      );
+      await getGifList();
+    } catch (error) {
+      console.log("Error creating BaseAccount account:", error);
+    }
+  };
+
   const submitGIF = async (event) => {
     event.preventDefault();
     if (inputValue.length > 0) {
@@ -85,6 +121,22 @@ const App = () => {
     console.log("Solana successfully disconnected");
   };
 
+  const getGifList = async () => {
+    try {
+      const provider = getProvider();
+      const program = new Program(idl, programID, provider);
+      const account = await program.account.baseAccount.fetch(
+        baseAccount.publicKey
+      );
+
+      console.log("Got the account", account);
+      setGifList(account.gifList);
+    } catch (error) {
+      console.log("Error in getGifList: ", error);
+      setGifList(null);
+    }
+  };
+
   useEffect(() => {
     const onLoad = async () => {
       await checkWalletIsConected();
@@ -96,7 +148,7 @@ const App = () => {
   useEffect(() => {
     if (walletAddress) {
       console.log("Fetching GIFs list");
-      setGifList(TEST_GIFS);
+      getGifList();
     }
   }, [walletAddress]);
 
@@ -120,6 +172,7 @@ const App = () => {
               onInputChange={onInputChange}
               submitGIF={submitGIF}
               gifList={gifList}
+              createGifAccount={createGifAccount}
             />
           )}
         </div>
@@ -153,22 +206,36 @@ const RenderConnectedContainer = ({
   inputValue,
   submitGIF,
   gifList,
+  createGifAccount,
 }) => {
-  return (
-    <div className="connected-container">
-      <Form
-        submitGIF={submitGIF}
-        inputChange={onInputChange}
-        inputValue={inputValue}
-      />
-      <div className="gif-grid">
-        {gifList.map((gif) => (
-          <div className="gif-item" key={gif}>
-            <img src={gif} alt={gif} />
-          </div>
-        ))}
+  if (gifList === null) {
+    return (
+      <div className="connected-container">
+        <button
+          className="cta-button submit-gif-button"
+          onClick={createGifAccount}
+        >
+          Do One-Time Initialization For GIF Program Account
+        </button>
       </div>
-    </div>
-  );
+    );
+  } else {
+    return (
+      <div className="connected-container">
+        <Form
+          submitGIF={submitGIF}
+          inputChange={onInputChange}
+          inputValue={inputValue}
+        />
+        <div className="gif-grid">
+          {gifList.map((gif) => (
+            <div className="gif-item" key={gif}>
+              <img src={gif} alt={gif} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 };
 export default App;
