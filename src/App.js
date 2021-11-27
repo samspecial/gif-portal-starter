@@ -9,7 +9,7 @@ import kp from "./keypair.json";
 
 // 8aTD2oktQ3abJr91FAW1fvYWbB8BeVLz5CWtXpuRU2Z
 
-const { SystemProgram, Keypair } = web3;
+const { SystemProgram } = web3;
 //get keypair
 const arr = Object.values(kp._keypair.secretKey);
 const secret = new Uint8Array(arr);
@@ -113,6 +113,7 @@ const App = () => {
       setInputValue("");
     } else console.log("No input, try again!");
   };
+
   const disconnectWallet = async () => {
     const { solana } = window;
 
@@ -128,8 +129,8 @@ const App = () => {
       const account = await program.account.baseAccount.fetch(
         baseAccount.publicKey
       );
-
       console.log("Got the account", account);
+      // console.log();
       setGifList(account.gifList);
     } catch (error) {
       console.log("Error in getGifList: ", error);
